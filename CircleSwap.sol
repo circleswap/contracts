@@ -61,6 +61,93 @@ contract Initializable {
 }
 
 
+contract Governable is Initializable {
+    address public governor;
+
+    event GovernorshipTransferred(address indexed previousGovernor, address indexed newGovernor);
+
+    /**
+     * @dev Contract initializer.
+     * called once by the factory at time of deployment
+     */
+    function initialize(address governor_) public initializer {     // virtual
+        governor = governor_;
+        emit GovernorshipTransferred(address(0), governor);
+    }
+
+    modifier governance() {
+        require(msg.sender == governor);
+        _;
+    }
+
+    /**
+     * @dev Allows the current governor to relinquish control of the contract.
+     * @notice Renouncing to governorship will leave the contract without an governor.
+     * It will not be possible to call the functions with the `governance`
+     * modifier anymore.
+     */
+    function renounceGovernorship() public governance {
+        emit GovernorshipTransferred(governor, address(0));
+        governor = address(0);
+    }
+
+    /**
+     * @dev Allows the current governor to transfer control of the contract to a newGovernor.
+     * @param newGovernor The address to transfer governorship to.
+     */
+    function transferGovernorship(address newGovernor) public governance {
+        _transferGovernorship(newGovernor);
+    }
+
+    /**
+     * @dev Transfers control of the contract to a newGovernor.
+     * @param newGovernor The address to transfer governorship to.
+     */
+    function _transferGovernorship(address newGovernor) internal {
+        require(newGovernor != address(0));
+        emit GovernorshipTransferred(governor, newGovernor);
+        governor = newGovernor;
+    }
+}
+
+
+contract Configurable is Governable {
+
+    mapping (bytes32 => uint) internal config;
+    
+    function getConfig(bytes32 key) public view returns (uint) {
+        return config[key];
+    }
+    function getConfig(bytes32 key, uint index) public view returns (uint) {
+        return config[bytes32(uint(key) ^ index)];
+    }
+    function getConfig(bytes32 key, address addr) public view returns (uint) {
+        return config[bytes32(uint(key) ^ uint(addr))];
+    }
+
+    function _setConfig(bytes32 key, uint value) internal {
+        if(config[key] != value)
+            config[key] = value;
+    }
+    function _setConfig(bytes32 key, uint index, uint value) internal {
+        _setConfig(bytes32(uint(key) ^ index), value);
+    }
+    function _setConfig(bytes32 key, address addr, uint value) internal {
+        _setConfig(bytes32(uint(key) ^ uint(addr)), value);
+    }
+    
+    function setConfig(bytes32 key, uint value) external governance {
+        _setConfig(key, value);
+    }
+    function setConfig(bytes32 key, uint index, uint value) external governance {
+        _setConfig(bytes32(uint(key) ^ index), value);
+    }
+    function setConfig(bytes32 key, address addr, uint value) public governance {
+        _setConfig(bytes32(uint(key) ^ uint(addr)), value);
+    }
+}
+
+
 interface IUniswapV2Factory {
     event PairCreated(address indexed token0, address indexed token1, address pair, uint);
 
@@ -1795,6 +1882,31 @@ contract CircleSwapRouter02 is IUniswapV2Router01, IUniswapV2Router02, Initializ
     }
 }
 
+contract CircleSwapRouter03 is CircleSwapRouter02, Configurable {
+    mapping (address => uint) public swapAmountOf;
+    
+    //function initialize(address _factory, address _WETH) public initializer {
+    //    super.initialize(_factory, _WETH);
+    //}
+
+    // **** SWAP ****
+    // requires the initial amount to have already been sent to the first pair
+    function _swap(uint[] memory amounts, address[] memory path, address _to) internal {    // virtual 
+        uint amt;
+        if(path[0] == WETH)
+            amt = amounts[0];
+        else if(IUniswapV2Factory(factory).getPair(path[0], WETH) != address(0)) {
+            (uint reserveIn, uint reserveOut) = UniswapV2Library.getReserves(factory, path[0], WETH);
+            amt = getAmountOut(amounts[0], reserveIn, reserveOut);
+        }
+        swapAmountOf[msg.sender] = swapAmountOf[msg.sender].add(amt);
+        
+        super._swap(amounts, path, _to);
+    }
+    
+}
+
+
 library UniswapV2Library {
     using SafeMath for uint;
     //bytes32 private constant PairCodeHash = keccak256(type(InitializableProductProxy).creationCode);      // it will be changed when deploy because of Swarm bzzr
@@ -1971,6 +2083,7 @@ library AddressWETH {
                 case  4  { addr := 0xc778417E063141139Fce010982780140Aa0cD5Ab }      // Ethereum Testnet Rinkeby
                 case  5  { addr := 0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6 }      // Ethereum Testnet Gorli
                 case 42  { addr := 0xd0A1E359811322d97991E03f863a0C30C2cF029C }      // Ethereum Testnet Kovan
+                case 56  { addr := 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c }      // BSC Mainnet
                 case 256 { addr := 0xB49f19289857f4499781AaB9afd4A428C4BE9CA8 }      // HBC Testnet 
                 default  { addr := 0x0                                        }      // unknown 
         }
