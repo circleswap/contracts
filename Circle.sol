@@ -32,7 +32,9 @@ contract Circle is ERC721UpgradeSafe, Configurable {
     mapping (address => uint) public refereeN;
     mapping (address => uint) public referee2N;
     
-    uint totalAirdropWeight;
+    uint public totalAirdropWeight;
+    
+    address[] public pools;
     
     function __Circle_init(address governor_, string memory name, string memory symbol, address CIR_, address router_) public initializer {
         Governable.initialize(governor_);
@@ -130,6 +132,28 @@ contract Circle is ERC721UpgradeSafe, Configurable {
     function members(uint256 tokenID, uint i) public view returns (address) {
         return _members[tokenID].at(i);
     }
+    
+    function poolN() external view returns (uint) {
+        return pools.length;
+    }
+
+    function addPool(address pool) virtual external governance {
+        IStakingPool(pool).rewardPerToken();      // just check
+        pools.push(pool);
+    }
+    
+    function paid(address acct) external view returns (uint amt) {
+        for(uint i=0; i<pools.length; i++)
+            amt = amt.add(IStakingPool(pools[i]).paid(acct));
+    }
+    function earned(address acct) external view returns (uint amt) {
+        for(uint i=0; i<pools.length; i++)
+            amt = amt.add(IStakingPool(pools[i]).earned(acct));
+    }
+    function getReward() external {
+        for(uint i=0; i<pools.length; i++)
+            IStakingPool(pools[i]).getReward(msg.sender);
+    }
 
     uint256[50] private __gap;
 }
@@ -137,4 +161,11 @@ contract Circle is ERC721UpgradeSafe, Configurable {
 
 interface CircleSwapRouter03 {
     function swapAmountOf(address acct) external view returns (uint);
+}
+
+interface IStakingPool {
+    function rewardPerToken() external view returns (uint);
+    function paid(address acct) external view returns (uint);
+    function earned(address acct) external view returns (uint);
+    function getReward(address acct) external;
 }

@@ -820,6 +820,8 @@ contract StakingPool is Configurable, StakingRewards {
 	uint public period;
 	uint public begin;
 
+    mapping (address => uint256) public paid;
+
     function initialize(address _governor, 
         address _rewardsDistribution,
         address _rewardsToken,
@@ -892,17 +894,22 @@ contract StakingPool is Configurable, StakingRewards {
         _;
     }
 
-    function getReward() override public nonReentrant updateReward(msg.sender) {
-        require(getConfig(_blocklist_, msg.sender) == 0, 'In blocklist');
-        bool isContract = msg.sender.isContract();
-        require(!isContract || config[_allowContract_] != 0 || getConfig(_allowlist_, msg.sender) != 0, 'No allowContract');
+    function getReward() virtual override public {
+        getReward(msg.sender);
+    }
+    function getReward(address payable acct) virtual public nonReentrant updateReward(acct) {
+        require(getConfig(_blocklist_, acct) == 0, 'In blocklist');
+        bool isContract = acct.isContract();
+        require(!isContract || config[_allowContract_] != 0 || getConfig(_allowlist_, acct) != 0, 'No allowContract');
 
-        uint256 reward = rewards[msg.sender];
+        uint256 reward = rewards[acct];
         if (reward > 0) {
-            rewards[msg.sender] = 0;
+            paid[acct] = paid[acct].add(reward);
+            paid[address(0)] = paid[address(0)].add(reward);
+            rewards[acct] = 0;
             rewards[address(0)] = rewards[address(0)].sub(reward);
-            rewardsToken.safeTransferFrom(rewardsDistribution, msg.sender, reward);
-            emit RewardPaid(msg.sender, reward);
+            rewardsToken.safeTransferFrom(rewardsDistribution, acct, reward);
+            emit RewardPaid(acct, reward);
         }
     }
 

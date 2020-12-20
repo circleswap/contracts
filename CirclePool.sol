@@ -15,9 +15,9 @@ contract CirclePool is StakingPool {
     ICircle internal _circle;
     uint256 internal _totalSupplyRefer;
     uint256 internal _totalSupplyCircle;
-    mapping(address => uint256) internal _balancesRefer;
-    mapping(uint256 => uint256) internal _balancesCircle;
-    
+    mapping (address => uint256) internal _balancesRefer;
+    mapping (uint256 => uint256) internal _balancesCircle;
+
     function __CirclePool_init(
         address _governor, 
         address _rewardsDistribution,
