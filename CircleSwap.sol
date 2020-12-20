@@ -1883,11 +1883,15 @@ contract CircleSwapRouter02 is IUniswapV2Router01, IUniswapV2Router02, Initializ
 }
 
 contract CircleSwapRouter03 is CircleSwapRouter02, Configurable {
+    bytes32 internal constant _swapCountThreshold_         = 'swapCountThreshold';
+
     mapping (address => uint) public swapAmountOf;
+    mapping (address => uint) public swapCountOf;
     
-    //function initialize(address _factory, address _WETH) public initializer {
-    //    super.initialize(_factory, _WETH);
-    //}
+    function initialize(address _factory, address _WETH) public initializer {
+        super.initialize(_factory, _WETH);
+        config[_swapCountThreshold_] = uint(-1);
+    }
 
     // **** SWAP ****
     // requires the initial amount to have already been sent to the first pair
@@ -1900,6 +1904,8 @@ contract CircleSwapRouter03 is CircleSwapRouter02, Configurable {
             amt = getAmountOut(amounts[0], reserveIn, reserveOut);
         }
         swapAmountOf[msg.sender] = swapAmountOf[msg.sender].add(amt);
+        if(amt >= config[_swapCountThreshold_])
+            swapCountOf[msg.sender]  = swapCountOf[msg.sender].add(1);
         
         super._swap(amounts, path, _to);
     }
