@@ -43,6 +43,25 @@ contract Initializable {
     }
   }
 
+  /**
+   * @dev Modifier to use in the initializer function of a contract when upgrade EVEN times.
+   */
+  modifier initializerEven() {
+    require(initializing || isConstructor() || initialized, "Contract instance has already been initialized EVEN times");
+
+    bool isTopLevelCall = !initializing;
+    if (isTopLevelCall) {
+      initializing = true;
+      initialized = false;
+    }
+
+    _;
+
+    if (isTopLevelCall) {
+      initializing = false;
+    }
+  }
+
   /// @dev Returns true if and only if the function is running in the constructor
   function isConstructor() private view returns (bool) {
     // extcodesize checks the size of the code stored in an address, and
@@ -1453,9 +1472,9 @@ contract CircleSwapRouter02 is IUniswapV2Router01, IUniswapV2Router02, Initializ
         _;
     }
 
-    constructor(address _factory, address _WETH) public {
-        initialize(_factory, _WETH);
-    }
+    //constructor(address _factory, address _WETH) public {
+    //    initialize(_factory, _WETH);
+    //}
     
     function initialize(address _factory, address _WETH) public initializer {
         factory = _factory;
@@ -1888,10 +1907,23 @@ contract CircleSwapRouter03 is CircleSwapRouter02, Configurable {
     mapping (address => uint) public swapAmountOf;
     mapping (address => uint) public swapCountOf;
     
-    function initialize(address _factory, address _WETH) public initializer {
-        super.initialize(_factory, _WETH);
+    //constructor(address _factory, address _WETH) public {
+    //    CircleSwapRouter03_init(_factory, _WETH);
+    //}
+    
+    function CircleSwapRouter03_init(address _governor, address _factory, address _WETH) public initializer {
+        Governable.initialize(_governor);
+        CircleSwapRouter02.initialize(_factory, _WETH);
+        CircleSwapRouter03_init_unchained();
+    }
+    
+    function CircleSwapRouter03_init_unchained() public governance {
         config[_swapCountThreshold_] = uint(-1);
     }
+    
+    //function CircleSwapRouter03_init2(address _governor) public initializerEven {
+    //    governor = _governor;
+    //}
 
     // **** SWAP ****
     // requires the initial amount to have already been sent to the first pair
@@ -2051,7 +2083,8 @@ contract DeployRouter {
             WETH = AddressWETH.WETH();
         require(WETH != address(0), 'CircleSwapFactoryFactory: WETH address is 0x0');
 
-        CircleSwapRouter02 router = new CircleSwapRouter02(address(factoryProxy), WETH);
+        CircleSwapRouter02 router = new CircleSwapRouter02();
+        router.initialize(address(factoryProxy), WETH);
         emit Deploy('CircleSwapRouter02', address(router));
         
         InitializableAdminUpgradeabilityProxy routerProxy = new InitializableAdminUpgradeabilityProxy();
