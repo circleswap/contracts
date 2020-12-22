@@ -3,9 +3,9 @@
 pragma solidity ^0.6.0;
 
 import "./StakingRewards.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC721/IERC721Metadata.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC721/IERC721Enumerable.sol";
+//import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC721/IERC721.sol";
+//import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC721/IERC721Metadata.sol";
+//import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC721/IERC721Enumerable.sol";
 //import "./Circle.sol";
 
 contract CirclePool is StakingPool {
@@ -13,10 +13,13 @@ contract CirclePool is StakingPool {
     bytes32 internal constant _refererWeight_           = 'refererWeight';
     
     ICircle internal _circle;
-    uint256 internal _totalSupplyRefer;
-    uint256 internal _totalSupplyCircle;
-    mapping (address => uint256) internal _balancesRefer;
-    mapping (uint256 => uint256) internal _balancesCircle;
+    uint256 public totalSupplyRefer;
+    uint256 public totalSupplyCircle;
+    mapping (address => uint256) public balanceReferOf;
+    mapping (uint256 => uint256) public balanceOfCircle;
+    mapping (uint256 => uint256) public supplyOfCircle;
+    mapping (uint256 => uint256) public rewardPerTokenStoredCircle;
+    mapping (address => mapping (uint256 => uint256)) public userRewardPerTokenCircle;      // acct => tokenID => rewardPerToken
 
     function __CirclePool_init(
         address _governor, 
@@ -32,34 +35,25 @@ contract CirclePool is StakingPool {
     
     function __CirclePool_init_unchained(address circle_) public governance {
         _circle = ICircle(circle_);
-        config[_stakingThreshold_]      = 100 ether;
+        config[_stakingThreshold_]    = 100 ether;
         _setConfig(_refererWeight_, 1, 0.25 ether);
         _setConfig(_refererWeight_, 2, 0.10 ether);
     }
 
-    function totalSupplyRefer() virtual public view returns (uint) {
-        return _totalSupplyRefer;
-    }
-    function totalSupplyCircle() virtual public view returns (uint) {
-        return _totalSupplyCircle;
-    }
     function totalSupplySum() virtual public view returns (uint) {
-        return totalSupply().add(totalSupplyRefer()).add(totalSupplyCircle());
+        return totalSupply().add(totalSupplyRefer).add(totalSupplyCircle);
     }
 
-    function balanceReferOf(address acct) virtual public view returns (uint) {
-        return _balancesRefer[acct];
-    }
     function balanceCircleOf(address acct) virtual public view returns (uint) {
         if(_balances[acct] == 0 || lptNetValue(_balances[acct]) < config[_stakingThreshold_])
             return 0;
         else if(_circle.balanceOf(acct) > 0)
-            return _balancesCircle[_circle.tokenOfOwnerByIndex(acct, 0)].sub(_balances[acct]);
+            return balanceOfCircle[_circle.tokenOfOwnerByIndex(acct, 0)].sub(_balances[acct]);
         else if(_circle.circleOf(acct) != 0)
-            return _balancesCircle[_circle.circleOf(acct)].div(_circle.membersCount(_circle.circleOf(acct)));
+            return balanceOfCircle[_circle.circleOf(acct)].div(_circle.membersCount(_circle.circleOf(acct)));
     }
     function balanceSumOf(address acct) virtual public view returns (uint) {
-        return balanceOf(acct).add(balanceReferOf(acct)).add(balanceCircleOf(acct));
+        return balanceOf(acct).add(balanceReferOf[acct]).add(balanceCircleOf(acct));
     }
     
     function lptNetValue(uint vol) public view returns (uint) {
@@ -83,9 +77,9 @@ contract CirclePool is StakingPool {
         address referer2 = _circle.refererOf(referer);
         uint inc1 = increasement.mul(getConfig(_refererWeight_, 1)).div(1 ether);
         uint inc2 = increasement.mul(getConfig(_refererWeight_, 2)).div(1 ether);
-        _balancesRefer[referer]  = _balancesRefer[referer ].add(inc1);
-        _balancesRefer[referer2] = _balancesRefer[referer2].add(inc2);
-        _totalSupplyRefer        = _totalSupplyRefer.add(inc1).add(inc2); 
+        balanceReferOf[referer]  = balanceReferOf[referer ].add(inc1);
+        balanceReferOf[referer2] = balanceReferOf[referer2].add(inc2);
+        totalSupplyRefer        = totalSupplyRefer.add(inc1).add(inc2); 
     }
     
     function decreaseBalanceRefer(address referee, uint decreasement) internal {
@@ -93,33 +87,35 @@ contract CirclePool is StakingPool {
         address referer2 = _circle.refererOf(referer);
         uint dec1 = decreasement.mul(getConfig(_refererWeight_, 1)).div(1 ether);
         uint dec2 = decreasement.mul(getConfig(_refererWeight_, 2)).div(1 ether);
-        _balancesRefer[referer]  = _balancesRefer[referer ].sub(dec1);
-        _balancesRefer[referer2] = _balancesRefer[referer2].sub(dec2);
-        _totalSupplyRefer        = _totalSupplyRefer.sub(dec1).sub(dec2); 
+        balanceReferOf[referer]  = balanceReferOf[referer ].sub(dec1);
+        balanceReferOf[referer2] = balanceReferOf[referer2].sub(dec2);
+        totalSupplyRefer        = totalSupplyRefer.sub(dec1).sub(dec2); 
     }
     
     function increaseBalanceCircle(address acct, uint increasement, uint oldBalanceCircle) internal {
-        if(_circle.balanceOf(acct) > 0) {
-            uint id = _circle.tokenOfOwnerByIndex(acct, 0);
-            _balancesCircle[id] = _balancesCircle[id].add(increasement);
-        } else {
-            uint id = _circle.circleOf(acct);
-            if(id != 0)
-                _balancesCircle[id] = _balancesCircle[id].add(increasement);
-        }
-        _totalSupplyCircle = _totalSupplyCircle.add(balanceCircleOf(acct)).sub(oldBalanceCircle);
+        uint id = circleOf(acct);
+        if(id != 0)
+            balanceOfCircle[id] = balanceOfCircle[id].add(increasement);
+        uint newBalanceCircle = balanceCircleOf(acct);
+        if(id != 0)
+            supplyOfCircle[id] = supplyOfCircle[id].add(newBalanceCircle).sub(oldBalanceCircle);
+        totalSupplyCircle = totalSupplyCircle.add(newBalanceCircle).sub(oldBalanceCircle);
     }
     
     function decreaseBalanceCircle(address acct, uint decreasement, uint oldBalanceCircle) internal {
-        if(_circle.balanceOf(acct) > 0) {
-            uint id = _circle.tokenOfOwnerByIndex(acct, 0);
-            _balancesCircle[id] = _balancesCircle[id].sub(decreasement);
-        } else {
-            uint id = _circle.circleOf(acct);
-            if(id != 0)
-                _balancesCircle[id] = _balancesCircle[id].sub(decreasement);
-        }
-        _totalSupplyCircle = _totalSupplyCircle.add(balanceCircleOf(acct)).sub(oldBalanceCircle);
+        uint id = circleOf(acct);
+        if(id != 0)
+            balanceOfCircle[id] = balanceOfCircle[id].sub(decreasement);
+        uint newBalanceCircle = balanceCircleOf(acct);
+        if(id != 0)
+            supplyOfCircle[id] = supplyOfCircle[id].add(newBalanceCircle).sub(oldBalanceCircle);
+        totalSupplyCircle = totalSupplyCircle.add(newBalanceCircle).sub(oldBalanceCircle);
+    }
+    
+    function circleOf(address acct) public view returns (uint id) {
+        id = _circle.circleOf(acct);
+        if(id == 0 && _circle.balanceOf(acct) > 0)
+            id = _circle.tokenOfOwnerByIndex(acct, 0);
     }
     
     function stakeWithPermit(uint256 amount, uint deadline, uint8 v, bytes32 r, bytes32 s) virtual override public {
@@ -155,34 +151,67 @@ contract CirclePool is StakingPool {
             );
     }
 
-    function earned(address account) override public view returns (uint256) {
-        return balanceSumOf(account).mul(rewardPerToken().sub(userRewardPerTokenPaid[account])).div(1e18).add(rewards[account]);
+    function rewardPerTokenCircle(uint id) virtual public view returns (uint) {
+        if (supplyOfCircle[id] == 0) {
+            return rewardPerTokenStoredCircle[id];
+        }
+        return
+            rewardPerTokenStoredCircle[id].add(
+                rewardDeltaCircle(id).mul(1e18).div(supplyOfCircle[id])
+            );
+    }
+    
+    function rewardDeltaCircle(uint id) virtual public view returns (uint) {
+        return supplyOfCircle[id].mul(rewardPerToken().sub(userRewardPerTokenPaid[address(id)])).div(1e18);
     }
 
-    modifier updateReward(address account) virtual override {
+    function earned(address acct) override public view returns (uint256) {
+        uint id = circleOf(acct);
+        return balanceCircleOf(acct).mul(rewardPerTokenCircle(id).sub(userRewardPerTokenCircle[acct][id])).div(1e18).add(
+            balanceOf(acct).add(balanceReferOf[acct]).mul(rewardPerToken().sub(userRewardPerTokenPaid[acct])).div(1e18).add(rewards[acct]));
+    }
+
+    modifier updateReward(address acct) virtual override {
         rewardPerTokenStored = rewardPerToken();
         rewards[address(0)] = rewards[address(0)].add(rewardDelta());
         lastUpdateTime = now;
-        if (account != address(0)) {
-            uint amt = rewards[account];
-            rewards[account] = earned(account);
-            userRewardPerTokenPaid[account] = rewardPerTokenStored;
+        if (acct != address(0)) {
+            uint delta = _updateReward(acct);
+        
+            uint id = circleOf(acct);
+            if(id != 0) {
+                userRewardPerTokenCircle[acct][id] = rewardPerTokenStoredCircle[id] = rewardPerTokenCircle(id);
+                userRewardPerTokenPaid[address(id)] = rewardPerTokenStored;
+            }
+            
+            acct = _circle.refererOf(acct);
+            delta = _updateReward(acct).add(delta);
+            delta = _updateReward(_circle.refererOf(acct)).add(delta);
 
-            amt = rewards[account].sub(amt);
             address addr = address(config[_ecoAddr_]);
             uint ratio = config[_ecoRatio_];
             if(addr != address(0) && ratio != 0) {
-                uint a = amt.mul(ratio).div(1 ether);
-                rewards[addr] = rewards[addr].add(a);
-                rewards[address(0)] = rewards[address(0)].add(a);
+                delta = delta.mul(ratio).div(1 ether);
+                rewards[addr] = rewards[addr].add(delta);
+                rewards[address(0)] = rewards[address(0)].add(delta);
             }
         }
         _;
     }
-
+    
+    function _updateReward(address acct) virtual internal returns (uint delta) {
+        delta = rewards[acct];
+        rewards[acct] = earned(acct);
+        userRewardPerTokenPaid[acct] = rewardPerTokenStored;
+        delta = rewards[acct].sub(delta);
+    }
+    
 }
 
-interface ICircle is IERC721, IERC721Metadata, IERC721Enumerable {
+interface ICircle {         // is IERC721, IERC721Metadata, IERC721Enumerable {
+    function balanceOf(address owner) external view returns (uint256 balance);
+    function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256 tokenId);
+
     function router() external view returns (address);
     function refererOf(address) external view returns (address);
     function circleOf(address) external view returns (uint);

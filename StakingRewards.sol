@@ -898,6 +898,7 @@ contract StakingPool is Configurable, StakingRewards {
         getReward(msg.sender);
     }
     function getReward(address payable acct) virtual public nonReentrant updateReward(acct) {
+        require(acct != address(0), 'invalid address');
         require(getConfig(_blocklist_, acct) == 0, 'In blocklist');
         bool isContract = acct.isContract();
         require(!isContract || config[_allowContract_] != 0 || getConfig(_allowlist_, acct) != 0, 'No allowContract');
