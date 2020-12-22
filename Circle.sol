@@ -1780,6 +1780,8 @@ contract Circle is ERC721UpgradeSafe, Configurable {
     
     address[] public pools;
     
+    mapping (string => uint) public tokenByURI;
+    
     function __Circle_init(address governor_, string memory name, string memory symbol, address CIR_, address router_) public initializer {
         Governable.initialize(governor_);
         __Context_init_unchained();
@@ -1844,20 +1846,26 @@ contract Circle is ERC721UpgradeSafe, Configurable {
         checkQualification(to);
     }
     
-    function mint(string memory name, uint level) external virtual {
+    function mint(string memory uri, uint level) external virtual {
         checkQualification(_msgSender());
         require(getConfig(_burnTicket_, level) > 0, 'unsupported level');
+        require(tokenByURI[uri] == 0, 'URI already exist');
         
         IERC20(CIR).transferFrom(_msgSender(), BurnAddress, getConfig(_burnTicket_, level));
         levelOf[nextID] = level;
         _mint(_msgSender(), nextID);
-        _setTokenURI(nextID, name);
-        emit Mint(_msgSender(), nextID, name, level);
+        _setTokenURI(nextID, uri);
+        tokenByURI[uri] = nextID;
+        emit Mint(_msgSender(), nextID, uri, level);
         nextID++;
     }
-    event Mint(address acct, uint tokenID, string name, uint level);
+    event Mint(address acct, uint tokenID, string uri, uint level);
     
-    function join(uint tokenID) external virtual {
+    function joinByOwner(address owner) external virtual {
+        require(balanceOf(owner) > 0, 'the owner has no circle');
+        join(tokenOfOwnerByIndex(owner, 0));
+    }
+    function join(uint tokenID) public virtual {
         checkQualification(_msgSender());
         require(_members[tokenID].length() < getConfig(_capacity_, levelOf[tokenID]), 'circle capacity overflow');
 
