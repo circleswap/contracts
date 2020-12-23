@@ -1877,7 +1877,10 @@ contract Circle is ERC721UpgradeSafe, Configurable {
     event Join(address acct, uint tokenID, address owner, uint count);
     
     function membersCount(uint256 tokenID) public view returns (uint) {
-        return _members[tokenID].length();
+        if(ownerOf(tokenID) == address(0))
+            return 0;
+        else
+            return _members[tokenID].length().add(1);
     }
     
     function members(uint256 tokenID, uint i) public view returns (address) {
