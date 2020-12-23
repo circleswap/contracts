@@ -12,7 +12,7 @@ contract CirclePool is StakingPool {
     bytes32 internal constant _stakingThreshold_        = 'stakingThreshold';
     bytes32 internal constant _refererWeight_           = 'refererWeight';
     
-    ICircle internal _circle;
+    ICircle public _circle;
     uint256 public totalSupplyRefer;
     uint256 public totalSupplyCircle;
     mapping (address => uint256) public balanceReferOf;
@@ -172,11 +172,19 @@ contract CirclePool is StakingPool {
     }
 
     modifier updateReward(address acct) virtual override {
+        (uint delta, uint d) = (rewardDelta(), 0);
+        address addr = address(config[_ecoAddr_]);
+        uint ratio = config[_ecoRatio_];
+        if(addr != address(0) && ratio != 0) {
+            d = delta.mul(ratio).div(1 ether);
+            rewards[addr] = rewards[addr].add(d);
+        }
+        rewards[address(0)] = rewards[address(0)].add(delta).add(d);
+
         rewardPerTokenStored = rewardPerToken();
-        rewards[address(0)] = rewards[address(0)].add(rewardDelta());
         lastUpdateTime = now;
         if (acct != address(0)) {
-            uint delta = _updateReward(acct);
+            _updateReward(acct);
         
             uint id = circleOf(acct);
             if(id != 0) {
@@ -184,26 +192,15 @@ contract CirclePool is StakingPool {
                 userRewardPerTokenPaid[address(id)] = rewardPerTokenStored;
             }
             
-            acct = _circle.refererOf(acct);
-            delta = _updateReward(acct).add(delta);
-            delta = _updateReward(_circle.refererOf(acct)).add(delta);
-
-            address addr = address(config[_ecoAddr_]);
-            uint ratio = config[_ecoRatio_];
-            if(addr != address(0) && ratio != 0) {
-                delta = delta.mul(ratio).div(1 ether);
-                rewards[addr] = rewards[addr].add(delta);
-                rewards[address(0)] = rewards[address(0)].add(delta);
-            }
+            _updateReward(acct = _circle.refererOf(acct));
+            _updateReward(_circle.refererOf(acct));
         }
         _;
     }
     
-    function _updateReward(address acct) virtual internal returns (uint delta) {
-        delta = rewards[acct];
+    function _updateReward(address acct) virtual internal {
         rewards[acct] = earned(acct);
         userRewardPerTokenPaid[acct] = rewardPerTokenStored;
-        delta = rewards[acct].sub(delta);
     }
     
 }
