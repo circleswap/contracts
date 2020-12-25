@@ -1950,7 +1950,8 @@ library UniswapV2Library {
     //bytes32 private constant PairCodeHash = keccak256(type(InitializableProductProxy).creationCode);      // it will be changed when deploy because of Swarm bzzr
     //bytes32 private constant PairCodeHash = hex'9e3d176cd7b9504eb5f6b77283eeba7ad886f58601c2a02d5adcb699159904b4';
     //bytes32 private constant PairCodeHash = hex'493e805a012a4ce1167ced187774d903abbec5300ab15a5c67fa30aad54cbc19';
-    bytes32 private constant PairCodeHash = hex'fedbb088ef498755e9141b5dd7d391cda1cccf1803cda25f76bfc0c3d685474a';
+    //bytes32 private constant PairCodeHash = hex'fedbb088ef498755e9141b5dd7d391cda1cccf1803cda25f76bfc0c3d685474a';      // HERC Testnet
+    bytes32 private constant PairCodeHash = hex'e7418267b22a1affb433ac6e8a6eae3a15890c6e6155eb347f72cd973625dcb6';      // HERC Mainnet
     
     function pairCodeHash() internal pure returns (bytes32) {
         return PairCodeHash;
