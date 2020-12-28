@@ -908,7 +908,7 @@ contract StakingPool is Configurable, StakingRewards {
             paid[acct] = paid[acct].add(reward);
             paid[address(0)] = paid[address(0)].add(reward);
             rewards[acct] = 0;
-            rewards[address(0)] = rewards[address(0)].sub(reward);
+            rewards[address(0)] = rewards[address(0)] > reward ? rewards[address(0)].sub(reward) : 0;
             rewardsToken.safeTransferFrom(rewardsDistribution, acct, reward);
             emit RewardPaid(acct, reward);
         }

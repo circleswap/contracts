@@ -20,6 +20,7 @@ contract CirclePool is StakingPool {
     mapping (uint256 => uint256) public supplyOfCircle;
     mapping (uint256 => uint256) public rewardPerTokenStoredCircle;
     mapping (address => mapping (uint256 => uint256)) public userRewardPerTokenCircle;      // acct => tokenID => rewardPerToken
+    mapping (address => uint256) public eligible;
 
     function __CirclePool_init(
         address _governor, 
@@ -45,7 +46,7 @@ contract CirclePool is StakingPool {
     }
 
     function balanceCircleOf(address acct) virtual public view returns (uint) {
-        if(_balances[acct] == 0 || lptNetValue(_balances[acct]) < config[_stakingThreshold_])
+        if(eligible[acct] == uint(-1) || eligible[acct] == 0 && lptNetValue(_balances[acct]) < config[_stakingThreshold_])
             return 0;
         else if(_circle.balanceOf(acct) > 0)
             return balanceOfCircle[_circle.tokenOfOwnerByIndex(acct, 0)].sub(_balances[acct]);
@@ -57,6 +58,8 @@ contract CirclePool is StakingPool {
     }
     
     function lptNetValue(uint vol) public view returns (uint) {
+        if(vol == 0)
+            return 0;
         CircleSwapRouter03 router = CircleSwapRouter03(_circle.router());
         address WHT = router.WETH();
         uint wht = IERC20(WHT).balanceOf(address(stakingToken));
@@ -72,7 +75,11 @@ contract CirclePool is StakingPool {
         }
     }
 
-    function increaseBalanceRefer(address referee, uint increasement) internal {
+    function _updateEligible(address acct) internal {
+        eligible[acct] = lptNetValue(_balances[acct]) >= config[_stakingThreshold_] ? 1 : uint(-1);
+    }
+    
+    function _increaseBalanceRefer(address referee, uint increasement) internal {
         address referer  = _circle.refererOf(referee);
         address referer2 = _circle.refererOf(referer);
         uint inc1 = increasement.mul(getConfig(_refererWeight_, 1)).div(1 ether);
@@ -82,7 +89,7 @@ contract CirclePool is StakingPool {
         totalSupplyRefer        = totalSupplyRefer.add(inc1).add(inc2); 
     }
     
-    function decreaseBalanceRefer(address referee, uint decreasement) internal {
+    function _decreaseBalanceRefer(address referee, uint decreasement) internal {
         address referer  = _circle.refererOf(referee);
         address referer2 = _circle.refererOf(referer);
         uint dec1 = decreasement.mul(getConfig(_refererWeight_, 1)).div(1 ether);
@@ -92,7 +99,7 @@ contract CirclePool is StakingPool {
         totalSupplyRefer        = totalSupplyRefer.sub(dec1).sub(dec2); 
     }
     
-    function increaseBalanceCircle(address acct, uint increasement, uint oldBalanceCircle) internal {
+    function _increaseBalanceCircle(address acct, uint increasement, uint oldBalanceCircle) internal {
         uint id = circleOf(acct);
         if(id != 0)
             balanceOfCircle[id] = balanceOfCircle[id].add(increasement);
@@ -102,7 +109,7 @@ contract CirclePool is StakingPool {
         totalSupplyCircle = totalSupplyCircle.add(newBalanceCircle).sub(oldBalanceCircle);
     }
     
-    function decreaseBalanceCircle(address acct, uint decreasement, uint oldBalanceCircle) internal {
+    function _decreaseBalanceCircle(address acct, uint decreasement, uint oldBalanceCircle) internal {
         uint id = circleOf(acct);
         if(id != 0)
             balanceOfCircle[id] = balanceOfCircle[id].sub(decreasement);
@@ -119,26 +126,29 @@ contract CirclePool is StakingPool {
     }
     
     function stakeWithPermit(uint256 amount, uint deadline, uint8 v, bytes32 r, bytes32 s) virtual override public {
-        require(_circle.balanceOf(msg.sender) > 0 || _circle.circleOf(msg.sender) != 0, "Not in circle");
+        require(circleOf(msg.sender) != 0, "Not in circle");
         uint balanceCircle = balanceCircleOf(msg.sender);
         super.stakeWithPermit(amount, deadline, v, r, s);
-        increaseBalanceRefer(msg.sender, amount);
-        increaseBalanceCircle(msg.sender, amount, balanceCircle);
+        _updateEligible(msg.sender);
+        _increaseBalanceRefer(msg.sender, amount);
+        _increaseBalanceCircle(msg.sender, amount, balanceCircle);
     }
 
     function stake(uint256 amount) virtual override public {
-        require(_circle.balanceOf(msg.sender) > 0 || _circle.circleOf(msg.sender) != 0, "Not in circle");
+        require(circleOf(msg.sender) != 0, "Not in circle");
         uint balanceCircle = balanceCircleOf(msg.sender);
         super.stake(amount);
-        increaseBalanceRefer(msg.sender, amount);
-        increaseBalanceCircle(msg.sender, amount, balanceCircle);
+        _updateEligible(msg.sender);
+        _increaseBalanceRefer(msg.sender, amount);
+        _increaseBalanceCircle(msg.sender, amount, balanceCircle);
     }
 
     function withdraw(uint256 amount) virtual override public {
         uint balanceCircle = balanceCircleOf(msg.sender);
         super.withdraw(amount);
-        decreaseBalanceRefer(msg.sender, amount);
-        decreaseBalanceCircle(msg.sender, amount, balanceCircle);
+        _updateEligible(msg.sender);
+        _decreaseBalanceRefer(msg.sender, amount);
+        _decreaseBalanceCircle(msg.sender, amount, balanceCircle);
     }
     
     function rewardPerToken() override public view returns (uint256) {
@@ -184,6 +194,9 @@ contract CirclePool is StakingPool {
         rewardPerTokenStored = rewardPerToken();
         lastUpdateTime = now;
         if (acct != address(0)) {
+            if(eligible[acct] == 0)
+                _updateEligible(acct);
+            
             _updateReward(acct);
         
             uint id = circleOf(acct);
