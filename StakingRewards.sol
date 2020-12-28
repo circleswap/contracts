@@ -874,23 +874,21 @@ contract StakingPool is Configurable, StakingRewards {
     }
 
     modifier updateReward(address account) virtual override {
+        (uint delta, uint d) = (rewardDelta(), 0);
         rewardPerTokenStored = rewardPerToken();
-        rewards[address(0)] = rewards[address(0)].add(rewardDelta());
         lastUpdateTime = now;
         if (account != address(0)) {
-            uint amt = rewards[account];
             rewards[account] = earned(account);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
-
-            amt = rewards[account].sub(amt);
-            address addr = address(config[_ecoAddr_]);
-            uint ratio = config[_ecoRatio_];
-            if(addr != address(0) && ratio != 0) {
-                uint a = amt.mul(ratio).div(1 ether);
-                rewards[addr] = rewards[addr].add(a);
-                rewards[address(0)] = rewards[address(0)].add(a);
-            }
         }
+
+        address addr = address(config[_ecoAddr_]);
+        uint ratio = config[_ecoRatio_];
+        if(addr != address(0) && ratio != 0) {
+            d = delta.mul(ratio).div(1 ether);
+            rewards[addr] = rewards[addr].add(d);
+        }
+        rewards[address(0)] = rewards[address(0)].add(delta).add(d);
         _;
     }
 
