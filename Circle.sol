@@ -1836,18 +1836,18 @@ contract Circle is ERC721UpgradeSafe, Configurable {
         return getConfig(_capacity_, level);
     }
     
-    function checkQualification(address acct) internal view virtual {
+    function _checkQualification(address acct) internal view virtual {
         require(eligible(acct), 'ineligible');
         require(balanceOf(acct) == 0, 'already owned circle');
         require(circleOf[acct] == 0, 'already joined circle');
     }
 
     function _beforeTokenTransfer(address, address to, uint256) internal virtual override {
-        checkQualification(to);
+        _checkQualification(to);
     }
     
     function mint(string memory uri, uint level) external virtual {
-        checkQualification(_msgSender());
+        _checkQualification(_msgSender());
         require(getConfig(_burnTicket_, level) > 0, 'unsupported level');
         require(tokenByURI[uri] == 0, 'URI already exist');
         
@@ -1866,7 +1866,7 @@ contract Circle is ERC721UpgradeSafe, Configurable {
         join(tokenOfOwnerByIndex(owner, 0));
     }
     function join(uint tokenID) public virtual {
-        checkQualification(_msgSender());
+        _checkQualification(_msgSender());
         require(_members[tokenID].length() < getConfig(_capacity_, levelOf[tokenID]), 'circle capacity overflow');
 
         IERC20(CIR).transferFrom(_msgSender(), BurnAddress, getConfig(_burnTicket_, 0));
@@ -1884,7 +1884,10 @@ contract Circle is ERC721UpgradeSafe, Configurable {
     }
     
     function members(uint256 tokenID, uint i) public view returns (address) {
-        return _members[tokenID].at(i);
+        if(i == 0)
+            return ownerOf(tokenID);
+        else
+            return _members[tokenID].at(i.sub(1));
     }
     
     function poolN() external view returns (uint) {
