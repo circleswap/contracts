@@ -3,10 +3,6 @@
 pragma solidity ^0.6.0;
 
 import "./StakingRewards.sol";
-//import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC721/IERC721.sol";
-//import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC721/IERC721Metadata.sol";
-//import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC721/IERC721Enumerable.sol";
-//import "./Circle.sol";
 
 contract CirclePool is StakingPool {
     bytes32 internal constant _stakingThreshold_        = 'stakingThreshold';
@@ -46,36 +42,6 @@ contract CirclePool is StakingPool {
         config[_membersWeight_]    =   1.00 ether;
         _setConfig(_refererWeight_, 1, 0.25 ether);
         _setConfig(_refererWeight_, 2, 0.10 ether);
-    }
-    
-    //function amendSupplyOfCircle(uint id) external {
-    //    uint oldSupply = supplyOfCircle[id];
-    //    uint supply;
-    //    for(uint i=0; i<circle.membersCount(id); i++)
-    //        supply = supply.add(balanceCircleOf(circle.members(id, i)));
-    //    supplyOfCircle[id] = supply;
-    //    totalSupplyCircle = totalSupplyCircle.add(supply).sub(oldSupply);
-    //}
-
-    function calcEligible(uint id) public view returns (uint count) {
-        for(uint i=1; i<circle.membersCount(id); i++)
-            if(eligible[circle.members(id, i)] == 1)
-                count++;
-    }
-    function amendEligible(uint id) public governance {
-        uint count;
-        for(uint i=1; i<circle.membersCount(id); i++) {
-            address acct = circle.members(id, i);
-            //eligible[acct] = lptNetValue(_balances[acct]) >= config[_stakingThreshold_] ? 1 : uint(-1);
-            if(eligible[acct] == 1)
-                count++;
-        }
-        //require(eligibleCount[id] != count, 'Correct, no need to amend');
-        eligibleCount[id] = count;
-    }
-    function amendEligibleMulti(uint id, uint N) external governance {
-        for(uint i=id; i<Math.min(id+N, circle.nextID()); i++)
-            amendEligible(i);
     }
     
     bytes32 internal constant _amendRewards_ = 'amendRewards';
