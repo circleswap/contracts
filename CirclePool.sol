@@ -51,6 +51,17 @@ contract CirclePool is StakingPool {
         totalSupplyCircle = totalSupplyCircle.add(supply).sub(oldSupply);
     }
 
+    function amendEligible(uint id) external governance {
+        uint count;
+        for(uint i=1; i<circle.membersCount(id); i++) {
+            address acct = circle.members(id, i);
+            eligible[acct] = lptNetValue(_balances[acct]) >= config[_stakingThreshold_] ? 1 : uint(-1);
+            if(eligible[acct] == 1)
+                count++;
+        }
+        eligibleCount[id] = count;
+    }
+
     function totalSupplySum() virtual public view returns (uint) {
         return totalSupply().add(totalSupplyRefer).add(totalSupplyCircle);
     }
@@ -112,9 +123,9 @@ contract CirclePool is StakingPool {
         address referer2 = circle.refererOf(referer);
         uint dec1 = circleOf(referer)   != 0 ? decreasement.mul(getConfig(_refererWeight_, 1)).div(1 ether) : 0;
         uint dec2 = circleOf(referer2)  != 0 ? decreasement.mul(getConfig(_refererWeight_, 2)).div(1 ether) : 0;
-        balanceReferOf[referer]  = balanceReferOf[referer ].sub(dec1);
-        balanceReferOf[referer2] = balanceReferOf[referer2].sub(dec2);
-        totalSupplyRefer        = totalSupplyRefer.sub(dec1).sub(dec2); 
+        balanceReferOf[referer]  = balanceReferOf[referer ].sub0(dec1);
+        balanceReferOf[referer2] = balanceReferOf[referer2].sub0(dec2);
+        totalSupplyRefer         = totalSupplyRefer.sub0(dec1).sub0(dec2); 
     }
     
     function _increaseBalanceCircle(address acct, uint increasement, uint oldBalanceCircle) internal {
@@ -135,8 +146,8 @@ contract CirclePool is StakingPool {
         balanceOfCircle[id] = balanceOfCircle[id].sub(decreasement);
         uint newBalanceCircle = balanceCircleOf(acct);
         uint delta = _deltaSupplyCircle(id, acct, decreasement).add(oldBalanceCircle).sub(newBalanceCircle);
-        supplyOfCircle[id] = supplyOfCircle[id].sub(delta);
-        totalSupplyCircle = totalSupplyCircle.sub(delta);
+        supplyOfCircle[id] = supplyOfCircle[id].sub0(delta);
+        totalSupplyCircle = totalSupplyCircle.sub0(delta);
     }
     
     function _deltaSupplyCircle(uint id, address acct, uint deltaBalance) internal view returns (uint delta) {

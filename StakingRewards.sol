@@ -89,6 +89,10 @@ library SafeMath {
         return c;
     }
 
+    function sub0(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a > b ? a - b : 0;
+    }
+    
     /**
      * @dev Returns the multiplication of two unsigned integers, reverting on
      * overflow.
@@ -906,7 +910,7 @@ contract StakingPool is Configurable, StakingRewards {
             paid[acct] = paid[acct].add(reward);
             paid[address(0)] = paid[address(0)].add(reward);
             rewards[acct] = 0;
-            rewards[address(0)] = rewards[address(0)] > reward ? rewards[address(0)].sub(reward) : 0;
+            rewards[address(0)] = rewards[address(0)].sub0(reward);
             rewardsToken.safeTransferFrom(rewardsDistribution, acct, reward);
             emit RewardPaid(acct, reward);
         }
