@@ -1911,6 +1911,10 @@ contract Circle is ERC721UpgradeSafe, Configurable {
         for(uint i=0; i<pools.length; i++)
             IStakingPool(pools[i]).getReward(msg.sender);
     }
+    function getReward(address acct) external {
+        for(uint i=0; i<pools.length; i++)
+            IStakingPool(pools[i]).getReward(acct);
+    }
 
     uint256[50] private __gap;
 }
