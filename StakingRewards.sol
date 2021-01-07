@@ -819,6 +819,11 @@ contract StakingPool is Configurable, StakingRewards {
 	bytes32 internal constant _allowContract_   = 'allowContract';
 	bytes32 internal constant _allowlist_       = 'allowlist';
 	bytes32 internal constant _blocklist_       = 'blocklist';
+	
+	bytes32 internal constant _rewards2Token_   = 'rewards2Token';
+	bytes32 internal constant _rewards2Ratio_   = 'rewards2Ratio';
+	//bytes32 internal constant _rewards2Span_    = 'rewards2Span';
+	bytes32 internal constant _rewards2Begin_   = 'rewards2Begin';
 
 	uint public lep;            // 1: linear, 2: exponential, 3: power
 	uint public period;
@@ -844,6 +849,13 @@ contract StakingPool is Configurable, StakingRewards {
         rewardsDuration = _span;
         begin           = _begin;
         periodFinish    = _begin.add(_span);
+    }
+    
+    function notifyReward2(address _rewards2Token, uint _ratio, /*uint _span,*/ uint _begin) virtual external governance updateReward(address(0)) {
+        config[_rewards2Token_] = uint(_rewards2Token);
+        config[_rewards2Ratio_] = _ratio;
+        //config[_rewards2Span_]  = _span;
+        config[_rewards2Begin_] = _begin;
     }
 
     function rewardDelta() public view returns (uint amt) {
@@ -913,11 +925,26 @@ contract StakingPool is Configurable, StakingRewards {
             rewards[address(0)] = rewards[address(0)].sub0(reward);
             rewardsToken.safeTransferFrom(rewardsDistribution, acct, reward);
             emit RewardPaid(acct, reward);
+            
+            if(config[_rewards2Token_] != 0 && config[_rewards2Begin_] <= now) {
+                uint reward2 = Math.min(reward.mul(config[_rewards2Ratio_]).div(1e18), IERC20(config[_rewards2Token_]).balanceOf(address(this)));
+                IERC20(config[_rewards2Token_]).safeTransfer(acct, reward2);
+                emit RewardPaid2(acct, reward2);
+            }
         }
     }
+    event RewardPaid2(address indexed user, uint256 reward2);
 
     function getRewardForDuration() override external view returns (uint256) {
         return rewardsToken.allowance(rewardsDistribution, address(this)).sub(rewards[address(0)]);
+    }
+    
+    function rewards2Token() virtual external view returns (address) {
+        return address(config[_rewards2Token_]);
+    }
+    
+    function rewards2Ratio() virtual external view returns (uint) {
+        return config[_rewards2Ratio_];
     }
     
 }
