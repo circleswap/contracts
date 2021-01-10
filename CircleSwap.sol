@@ -552,7 +552,7 @@ contract CircleSwapPair is IUniswapV2Pair, UniswapV2ERC20 {
         { // scope for reserve{0,1}Adjusted, avoids stack too deep errors
         uint balance0Adjusted = balance0.mul(10000).sub(amount0In.mul(35));
         uint balance1Adjusted = balance1.mul(10000).sub(amount1In.mul(35));
-        require(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2), 'UniswapV2: K');
+        require(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(10000**2), 'UniswapV2: K');
         }
 
         _update(balance0, balance1, _reserve0, _reserve1);
@@ -1993,9 +1993,9 @@ library UniswapV2Library {
     function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) internal pure returns (uint amountOut) {
         require(amountIn > 0, 'UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT');
         require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
-        uint amountInWithFee = amountIn.mul(997);
+        uint amountInWithFee = amountIn.mul(9965);
         uint numerator = amountInWithFee.mul(reserveOut);
-        uint denominator = reserveIn.mul(1000).add(amountInWithFee);
+        uint denominator = reserveIn.mul(10000).add(amountInWithFee);
         amountOut = numerator / denominator;
     }
 
@@ -2003,8 +2003,8 @@ library UniswapV2Library {
     function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) internal pure returns (uint amountIn) {
         require(amountOut > 0, 'UniswapV2Library: INSUFFICIENT_OUTPUT_AMOUNT');
         require(reserveIn > 0 && reserveOut > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
-        uint numerator = reserveIn.mul(amountOut).mul(1000);
-        uint denominator = reserveOut.sub(amountOut).mul(997);
+        uint numerator = reserveIn.mul(amountOut).mul(10000);
+        uint denominator = reserveOut.sub(amountOut).mul(9965);
         amountIn = (numerator / denominator).add(1);
     }
 
