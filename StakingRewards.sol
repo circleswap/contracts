@@ -862,7 +862,7 @@ contract StakingPool is Configurable, StakingRewards {
         if(begin == 0 || begin >= now || lastUpdateTime >= now)
             return 0;
             
-        amt = rewardsToken.allowance(rewardsDistribution, address(this)).sub(rewards[address(0)]);
+        amt = rewardsToken.allowance(rewardsDistribution, address(this)).sub0(rewards[address(0)]);
         
         // calc rewardDelta in period
         if(lep == 3) {                                                              // power
@@ -936,7 +936,7 @@ contract StakingPool is Configurable, StakingRewards {
     event RewardPaid2(address indexed user, uint256 reward2);
 
     function getRewardForDuration() override external view returns (uint256) {
-        return rewardsToken.allowance(rewardsDistribution, address(this)).sub(rewards[address(0)]);
+        return rewardsToken.allowance(rewardsDistribution, address(this)).sub0(rewards[address(0)]);
     }
     
     function rewards2Token() virtual external view returns (address) {
