@@ -1782,6 +1782,12 @@ contract Circle is ERC721UpgradeSafe, Configurable {
     
     mapping (string => uint) public tokenByURI;
     
+    address farm;
+    uint public totalAirdrop;
+    mapping (address => uint) public airdropedOf;
+    mapping (address => uint) public refereeN_;             // after airdrop
+    mapping (address => uint) public referee2N_;
+    
     function __Circle_init(address governor_, string memory name, string memory symbol, address CIR_, address router_) public initializer {
         Governable.initialize(governor_);
         __Context_init_unchained();
@@ -1810,16 +1816,24 @@ contract Circle is ERC721UpgradeSafe, Configurable {
         refererOf[_msgSender()] = _msgSender();
     }
     
+    function __Circle_init_airdrop(uint totalAirdrop_, uint totalAirdropWeight_, address farm_) external governance {
+        totalAirdrop = totalAirdrop_;
+        totalAirdropWeight = totalAirdropWeight_;
+        farm = farm_;
+    }
+    
     function bind(address referer) virtual public {
         require(refererOf[_msgSender()] == address(0), 'Already binded');
         require(refererOf[referer] != address(0), 'referer has not binded yet');
         require(referer != _msgSender() && refererOf[referer] != _msgSender() && refererOf[refererOf[referer]] != _msgSender(), 'No bind cyclic');
         refererOf[_msgSender()] = referer;
         
-        uint airdropWeight2 = airdropWeight(referer).add(airdropWeight(refererOf[referer]));
-        refereeN[referer] = refereeN[referer].add(1);
-        referee2N[refererOf[referer]] = referee2N[refererOf[referer]].add(1);
-        totalAirdropWeight = totalAirdropWeight.add(airdropWeight(referer)).add(airdropWeight(refererOf[referer])).sub(airdropWeight2);
+        //uint airdropWeight2 = airdropWeight(referer).add(airdropWeight(refererOf[referer]));
+        //refereeN[referer] = refereeN[referer].add(1);
+        //referee2N[refererOf[referer]] = referee2N[refererOf[referer]].add(1);
+        //totalAirdropWeight = totalAirdropWeight.add(airdropWeight(referer)).add(airdropWeight(refererOf[referer])).sub(airdropWeight2);           // before airdrop
+        refereeN_[referer] = refereeN_[referer].add(1);                                                                                             // after  airdrop
+        referee2N_[refererOf[referer]] = referee2N_[refererOf[referer]].add(1);
         emit Bind(_msgSender(), referer, refererOf[referer]);
     }
     event Bind(address indexed referee, address indexed referer, address indexed referer2);
@@ -1827,7 +1841,25 @@ contract Circle is ERC721UpgradeSafe, Configurable {
     function airdropWeight(address acct) public view returns (uint) {
         return uint(1 ether).add(getConfig(_airdropWeight_, 1).mul(Math.min(getConfig(_airdropWeightMaxN_, 1), refereeN[acct]))).add(getConfig(_airdropWeight_, 2).mul(Math.min(getConfig(_airdropWeightMaxN_, 2), referee2N[acct])));
     }
-
+    
+    function airdropVol(address acct) public view returns (uint) {
+        if(eligible(acct))
+            return totalAirdrop.mul(airdropWeight(acct)).div(totalAirdropWeight);
+        else
+            return 0;
+    }
+    
+    function airdrop() external {
+        require(eligible(_msgSender()), 'ineligible');
+        require(airdropedOf[_msgSender()] == 0, 'airdroped already');
+        
+        uint vol = airdropVol(_msgSender());
+        airdropedOf[_msgSender()] = vol;
+        IERC20(CIR).transferFrom(farm, _msgSender(), vol);
+        emit Airdrop(_msgSender(), vol);
+    }
+    event Airdrop(address indexed acct, uint vol);
+    
     function eligible(address acct) public view virtual returns (bool) {
         return refererOf[acct] != address(0) && CircleSwapRouter03(router).swapAmountOf(acct) >= config[_swapAmountThreshold_];
     }
@@ -1908,7 +1940,7 @@ contract Circle is ERC721UpgradeSafe, Configurable {
             amt = amt.add(IStakingPool(pools[i]).earned(acct));
     }
     function getReward() external {
-        getReward(msg.sender);
+        getReward(_msgSender());
     }
     function getReward(address acct) public {
         for(uint i=0; i<pools.length; i++)
