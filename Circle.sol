@@ -1787,6 +1787,7 @@ contract Circle is ERC721UpgradeSafe, Configurable {
     mapping (address => uint) public airdropedOf;
     mapping (address => uint) public refereeN_;             // after airdrop
     mapping (address => uint) public referee2N_;
+    mapping (address => uint) public bindTime;
     
     function __Circle_init(address governor_, string memory name, string memory symbol, address CIR_, address router_) public initializer {
         Governable.initialize(governor_);
@@ -1834,6 +1835,7 @@ contract Circle is ERC721UpgradeSafe, Configurable {
         //totalAirdropWeight = totalAirdropWeight.add(airdropWeight(referer)).add(airdropWeight(refererOf[referer])).sub(airdropWeight2);           // before airdrop
         refereeN_[referer] = refereeN_[referer].add(1);                                                                                             // after  airdrop
         referee2N_[refererOf[referer]] = referee2N_[refererOf[referer]].add(1);
+        bindTime[_msgSender()] = now;
         emit Bind(_msgSender(), referer, refererOf[referer]);
     }
     event Bind(address indexed referee, address indexed referer, address indexed referer2);
@@ -1843,7 +1845,7 @@ contract Circle is ERC721UpgradeSafe, Configurable {
     }
     
     function airdropVol(address acct) public view returns (uint) {
-        if(eligible(acct))
+        if(eligible(acct) && bindTime[acct] == 0)
             return totalAirdrop.mul(airdropWeight(acct)).div(totalAirdropWeight);
         else
             return 0;
